@@ -1,3 +1,5 @@
+#ifndef __LATTE_ECHO_CLIENT_H
+#define __LATTE_ECHO_CLIENT_H
 #include "ae/ae.h"
 #include "connection/connection.h"
 #include "sds/sds.h"
@@ -10,3 +12,4 @@ typedef struct client {
 
 client *createEchoClient();
 void freeEchoClient(client *c);
+#endif

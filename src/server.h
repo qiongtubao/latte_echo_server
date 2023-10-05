@@ -27,8 +27,7 @@
 typedef void *(*tcpHandlerFunc)(aeEventLoop *el, int fd, void *privdata, int mask);
 
 
-/* Global vars */
-struct latteEchoServer server; /* Server global state */
+
 config* createServerConfig();
 
 /** latte redis server **/
