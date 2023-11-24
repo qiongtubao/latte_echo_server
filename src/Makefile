@@ -32,3 +32,6 @@ clean:
 	cd ../deps/latte_c && make clean_all 
 	rm -rf *.o 
 	rm -rf main
+
+test: 
+	@(cd ..; ./runtest )
