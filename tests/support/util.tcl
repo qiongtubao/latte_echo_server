@@ -1,7 +1,6 @@
 
 
 
-
 set ::last_port_attempted 0
 proc find_available_port {start count} {
     set port [expr $::last_port_attempted + 1]
@@ -52,6 +51,7 @@ proc colorstr {color str} {
     } else {
         return $str
     }
+<<<<<<< HEAD
 }
 
 proc start_echo_server {options {code undefined}} {
@@ -93,4 +93,6 @@ proc start_echo_server {options {code undefined}} {
         set ::tags [lrange $::tags 0 end-[llength $tags]]
         return
     }
+=======
+>>>>>>> 97a5833 (only save)
 }
