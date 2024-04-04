@@ -11,8 +11,9 @@
 #include "endianconv/endianconv.h"
 #include "rax/rax.h"
 #include "server/server.h"
+#include "log/log.h"
 
-
+#define LATTE_ECHO_SERVER_LOG_TAG "latte_ECHO_SERVER"
 /* Error codes */
 #define SERVER_OK                    0
 #define SERVER_ERR                   -1
@@ -24,7 +25,7 @@
 // } socketFds;
 #define ANET_ERR_LEN 256
 
-typedef void *(*tcpHandlerFunc)(aeEventLoop *el, int fd, void *privdata, int mask);
+typedef void (*tcpHandlerFunc)(aeEventLoop *el, int fd, void *privdata, int mask);
 
 
 
@@ -56,4 +57,6 @@ typedef struct latteEchoServer {
 
 PRIVATE int startEchoServer(struct latteEchoServer* redisServer, int argc, sds* argv);
 
+
+#define echoServerLog(log, ...) log_log(LATTE_ECHO_SERVER_LOG_TAG, log, __FILE__, __FUNCTION__, __LINE__, __VA_ARGS__) 
 #endif

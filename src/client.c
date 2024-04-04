@@ -3,12 +3,14 @@
 #include "utils/atomic.h"
 #include "zmalloc/zmalloc.h"
 #include <string.h>
+#include "server.h"
+
 
 int echoHandler(struct latteClient* lc) {
     struct client* c = (struct client*)lc; 
     lc->qb_pos = sdslen(lc->querybuf);
     if (connWrite(lc->conn, lc->querybuf, lc->qb_pos) == -1) {
-        printf("write fail");
+        echoServerLog(LOG_DEBUG,"write fail");
     }
     return 1;
 }

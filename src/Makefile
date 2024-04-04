@@ -1,5 +1,5 @@
 
-LIB_MODUELS="sds dict ae config connection list endianconv rax server"
+LIB_MODUELS="sds dict ae config connection list endianconv rax server log"
 
 uname_S:= $(shell sh -c 'uname -s 2>/dev/null || echo not')
 uname_M:= $(shell sh -c 'uname -s 2>/dev/null || echo not')
