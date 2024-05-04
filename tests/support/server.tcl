@@ -43,8 +43,6 @@ proc tags {tags code} {
     }
     uplevel 1 $code
     set ::tags [lrange $::tags 0 end-[llength $tags]]
-<<<<<<< HEAD
-=======
 }
 
 proc spawn_server {main config_file stdout stderr} {
@@ -69,6 +67,16 @@ proc spawn_server {main config_file stdout stderr} {
     # Tell the test server about this new instance.
     send_data_packet $::test_server_fd server-spawned $pid
     return $pid
+}
+
+proc start_server_error {config_file error} {
+    set err {}
+    append err "Can't start the Redis server\n"
+    append err "CONFIGURATION:"
+    append err [exec cat $config_file]
+    append err "\nERROR:"
+    append err [string trim $error]
+    send_data_packet $::test_server_fd err $err
 }
 
 proc wait_server_started {config_file stdout pid} {
@@ -108,6 +116,33 @@ proc create_server_config_file {filename config} {
     close $fp
 }
 
+proc ping_server {host port} {
+    set retval 0
+    if {[catch {
+        if {$::tls} {
+            set fd [::tls::socket $host $port] 
+        } else {
+            set fd [socket $host $port]
+        }
+        fconfigure $fd -translation binary
+        puts $fd "PING\n"
+        flush $fd
+        set reply [gets $fd]
+        if {[string range $reply 0 4] eq {PING}} {
+            set retval 1
+        }
+        close $fd
+    } e]} {
+        if {$::verbose} {
+            puts -nonewline "."
+        }
+    } else {
+        if {$::verbose} {
+            puts -nonewline "ok"
+        }
+    }
+    return $retval
+}
 
 # Return 1 if the server at the specified addr is reachable by PING, otherwise
 # returns 0. Performs a try every 50 milliseconds for the specified number
@@ -125,7 +160,99 @@ proc server_is_up {host port retrynum} {
     return 0
 }
 
+proc is_alive config {
+    set pid [dict get $config pid]
+    if {[catch {exec ps -p $pid} err]} {
+        return 0
+    } else {
+        return 1
+    }
+}
+
+proc kill_server config {
+    # nothing to kill when running against external server
+    if {$::external} return
+
+    # nevermind if its already dead
+    if {![is_alive $config]} { return }
+    set pid [dict get $config pid]
+
+    # check for leaks
+    if {![dict exists $config "skipleaks"]} {
+        catch {
+            if {[string match {*Darwin*} [exec uname -a]]} {
+                tags {"leaks"} {
+                    test "Check for memory leaks (pid $pid)" {
+                        set output {0 leaks}
+                        catch {exec leaks $pid} output
+                        if {[string match {*process does not exist*} $output] ||
+                            [string match {*cannot examine*} $output]} {
+                            # In a few tests we kill the server process.
+                            set output "0 leaks"
+                        }
+                        set output
+                    } {*0 leaks*}
+                }
+            }
+        }
+    }
+
+    # kill server and wait for the process to be totally exited
+    send_data_packet $::test_server_fd server-killing $pid
+    catch {exec kill $pid}
+    if {$::valgrind} {
+        set max_wait 60000
+    } else {
+        set max_wait 10000
+    }
+    while {[is_alive $config]} {
+        incr wait 10
+
+        if {$wait >= $max_wait} {
+            puts "Forcing process $pid to exit..."
+            catch {exec kill -KILL $pid}
+        } elseif {$wait % 1000 == 0} {
+            puts "Waiting for process $pid to exit..."
+        }
+        after 10
+    }
+
+    # Check valgrind errors if needed
+    if {$::valgrind} {
+        check_valgrind_errors [dict get $config stderr]
+    }
+
+    # Remove this pid from the set of active pids in the test server.
+    send_data_packet $::test_server_fd server-killed $pid
+}
+
+proc reconnect {args} {
+    set level [lindex $args 0]
+    if {[string length $level] == 0 || ![string is integer $level]} {
+        set level 0
+    }
+
+    set srv [lindex $::servers end+$level]
+    set host [dict get $srv "host"]
+    set port [dict get $srv "port"]
+    set config [dict get $srv "config"]
+    set client [echo_client $host $port 0 $::tls]
+    dict set srv "client" $client
+
+    # select the right db when we don't have to authenticate
+    # if {![dict exists $config "requirepass"]} {
+    #     $client select 9
+    # }
+
+    # re-set $srv in the servers list
+    lset ::servers end+$level $srv
+}
+
 proc start_echo_server {options {code undefined}} {
+    # If we are running against an external server, we just push the
+    # host/port pair in the stack the first time
+
+
     set baseconfig "default.conf"
     set overrides {}
     set omit {}
@@ -204,7 +331,19 @@ proc start_echo_server {options {code undefined}} {
         }
         set server_started 1
     }
+    # set port_param [expr $::tls ? {"tls-port"} : {"port"}]
+    set host $::host
+    if {[dict exists $config bind]} { set host [dict get $config bind] }
+    # if {[dict exists $config $port_param]} { set port [dict get $config $port_param] }
 
+    #设置属性
+    dict set srv "config_file" $config_file
+    dict set srv "config" $config
+    dict set srv "pid" $pid
+    dict set srv "host" $host
+    dict set srv "port" $port
+    dict set srv "stdout" $stdout
+    dict set srv "stderr" $stderr
 
     if {$code ne "undefined"} {
         # append the server to the stack
@@ -219,62 +358,27 @@ proc start_echo_server {options {code undefined}} {
         # execute provided block
         set num_tests $::num_tests
         if {[catch { uplevel 1 $code } error]} {
+            puts $error
             set backtrace $::errorInfo
-            set assertion [string match "assertion:*" $error]
-
-            # fetch srv back from the server list, in case it was restarted by restart_server (new PID)
-            set srv [lindex $::servers end]
-
-            # pop the server object
-            set ::servers [lrange $::servers 0 end-1]
 
             # Kill the server without checking for leaks
             dict set srv "skipleaks" 1
-            
+            kill_server $srv
 
-            if {$::dump_logs && $assertion} {
-                # if we caught an assertion ($::num_failed isn't incremented yet)
-                # this happens when the test spawns a server and not the other way around
-                dump_server_log $srv
+            # Print warnings from log
+            puts [format "\nLogged warnings (pid %d):" [dict get $srv "pid"]]
+            set warnings [warnings_from_file [dict get $srv "stdout"]]
+            if {[string length $warnings] > 0} {
+                puts "$warnings"
             } else {
-                # Print crash report from log
-                set crashlog [crashlog_from_file [dict get $srv "stdout"]]
-                if {[string length $crashlog] > 0} {
-                    puts [format "\nLogged crash report (pid %d):" [dict get $srv "pid"]]
-                    puts "$crashlog"
-                    puts ""
-                }
-
-                set sanitizerlog [sanitizer_errors_from_file [dict get $srv "stderr"]]
-                if {[string length $sanitizerlog] > 0} {
-                    puts [format "\nLogged sanitizer errors (pid %d):" [dict get $srv "pid"]]
-                    puts "$sanitizerlog"
-                    puts ""
-                }
+                puts "(none)"
             }
+            puts ""
 
-            if {!$assertion && $::durable} {
-                # durable is meant to prevent the whole tcl test from exiting on
-                # an exception. an assertion will be caught by the test proc.
-                set msg [string range $error 10 end]
-                lappend details $msg
-                lappend details $backtrace
-                lappend ::tests_failed $details
-
-                incr ::num_failed
-                send_data_packet $::test_server_fd err [join $details "\n"]
-            } else {
-                # Re-raise, let handler up the stack take care of this.
-                error $error $backtrace
-            }
-        } else {
-            if {$::dump_logs && $prev_num_failed != $::num_failed} {
-                dump_server_log $srv
-            }
-        }
-
-        # fetch srv back from the server list, in case it was restarted by restart_server (new PID)
-        set srv [lindex $::servers end]
+            error $error $backtrace
+        
+        
+        } 
 
         # Don't do the leak check when no tests were run
         if {$num_tests == $::num_tests} {
@@ -286,15 +390,31 @@ proc start_echo_server {options {code undefined}} {
 
         set ::tags [lrange $::tags 0 end-[llength $tags]]
         kill_server $srv
-        if {!$keep_persistence} {
-            clean_persistence $srv
-        }
-        set _ ""
     } else {
         set ::tags [lrange $::tags 0 end-[llength $tags]]
         set _ $srv
     }
     
 
->>>>>>> 97a5833 (only save)
+}
+
+# Return all log lines starting with the first line that contains a warning.
+# Generally, this will be an assertion error with a stack trace.
+proc warnings_from_file {filename} {
+    set lines [split [exec cat $filename] "\n"]
+    set matched 0
+    set logall 0
+    set result {}
+    foreach line $lines {
+        if {[string match {*REDIS BUG REPORT START*} $line]} {
+            set logall 1
+        }
+        if {[regexp {^\[\d+\]\s+\d+\s+\w+\s+\d{2}:\d{2}:\d{2} \#} $line]} {
+            set matched 1
+        }
+        if {$logall || $matched} {
+            lappend result $line
+        }
+    }
+    join $result "\n"
 }

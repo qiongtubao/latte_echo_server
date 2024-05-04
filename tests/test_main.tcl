@@ -5,6 +5,7 @@ source tests/support/util.tcl
 source tests/support/server.tcl
 source tests/support/tmpfile.tcl
 source tests/support/test.tcl
+source tests/support/echo_client.tcl
 # 测试实例
 set ::all_tests {
     unit/echo
@@ -29,7 +30,8 @@ set ::external 0; # If "1" this means, we are running against external instance
 set ::last_progress [clock seconds]
 set ::allowtags {}
 set ::denytags {}
-
+set ::stop_on_failure 0
+set ::tls 0
 
 
 set ::timeout 1200; # 20 minutes without progresses will quit the test.
@@ -160,6 +162,11 @@ proc signal_idle_client fd {
 }
 
 
+proc kill_clients {} {
+    foreach p $::clients_pids {
+        catch {exec kill $p}
+    }
+}
 
 # This is the readable handler of our test server. Clients send us messages
 # in the form of a status code such and additional data. Supported
@@ -391,89 +398,8 @@ proc signal_idle_client fd {
     }
 }
 
-# This is the readable handler of our test server. Clients send us messages
-# in the form of a status code such and additional data. Supported
-# status types are:
-#
-# ready: the client is ready to execute the command. Only sent at client
-#        startup. The server will queue the client FD in the list of idle
-#        clients.
-# testing: just used to signal that a given test started.
-# ok: a test was executed with success.
-# err: a test was executed with an error.
-# skip: a test was skipped by skipfile or individual test options.
-# ignore: a test was skipped by a group tag.
-# exception: there was a runtime exception while executing the test.
-# done: all the specified test file was processed, this test client is
-#       ready to accept a new task.
-proc read_from_test_client fd {
-    set bytes [gets $fd]
-    set payload [read $fd $bytes]
-    foreach {status data} $payload break
-    set ::last_progress [clock seconds]
 
-    if {$status eq {ready}} {
-        if {!$::quiet} {
-            puts "\[$status\]: $data"
-        }
-        signal_idle_client $fd
-    } elseif {$status eq {done}} {
-        set elapsed [expr {[clock seconds]-$::clients_start_time($fd)}]
-        set all_tests_count [llength $::all_tests]
-        set running_tests_count [expr {[llength $::active_clients]-1}]
-        set completed_tests_count [expr {$::next_test-$running_tests_count}]
-        puts "\[$completed_tests_count/$all_tests_count [colorstr yellow $status]\]: $data ($elapsed seconds)"
-        lappend ::clients_time_history $elapsed $data
-        signal_idle_client $fd
-        set ::active_clients_task($fd) "(DONE) $data"
-    } elseif {$status eq {ok}} {
-        if {!$::quiet} {
-            puts "\[[colorstr green $status]\]: $data"
-        }
-        set ::active_clients_task($fd) "(OK) $data"
-    } elseif {$status eq {skip}} {
-        if {!$::quiet} {
-            puts "\[[colorstr yellow $status]\]: $data"
-        }
-    } elseif {$status eq {ignore}} {
-        if {!$::quiet} {
-            puts "\[[colorstr cyan $status]\]: $data"
-        }
-    } elseif {$status eq {err}} {
-        set err "\[[colorstr red $status]\]: $data"
-        puts $err
-        lappend ::failed_tests $err
-        set ::active_clients_task($fd) "(ERR) $data"
-        if {$::stop_on_failure} {
-            puts -nonewline "(Test stopped, press enter to resume the tests)"
-            flush stdout
-            gets stdin
-        }
-    } elseif {$status eq {exception}} {
-        puts "\[[colorstr red $status]\]: $data"
-        kill_clients
-        force_kill_all_servers
-        exit 1
-    } elseif {$status eq {testing}} {
-        set ::active_clients_task($fd) "(IN PROGRESS) $data"
-    } elseif {$status eq {server-spawning}} {
-        set ::active_clients_task($fd) "(SPAWNING SERVER) $data"
-    } elseif {$status eq {server-spawned}} {
-        lappend ::active_servers $data
-        set ::active_clients_task($fd) "(SPAWNED SERVER) pid:$data"
-    } elseif {$status eq {server-killing}} {
-        set ::active_clients_task($fd) "(KILLING SERVER) pid:$data"
-    } elseif {$status eq {server-killed}} {
-        set ::active_servers [lsearch -all -inline -not -exact $::active_servers $data]
-        set ::active_clients_task($fd) "(KILLED SERVER) pid:$data"
-    } elseif {$status eq {run_solo}} {
-        lappend ::run_solo_tests $data
-    } else {
-        if {!$::quiet} {
-            puts "\[$status\]: $data"
-        }
-    }
-}
+
 
 # The client is not even driven (the test server is instead) as we just need
 # to read the command, execute, reply... all this in a loop.

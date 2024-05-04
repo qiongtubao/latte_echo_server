@@ -13,7 +13,7 @@
 #include "server/server.h"
 #include "log/log.h"
 
-#define LATTE_ECHO_SERVER_LOG_TAG "latte_ECHO_SERVER"
+#define LATTE_ECHO_SERVER_LOG_TAG "latte_echo_server"
 /* Error codes */
 #define SERVER_OK                    0
 #define SERVER_ERR                   -1

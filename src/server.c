@@ -282,16 +282,20 @@ int startEchoServer(struct latteEchoServer* echoServer, int argc, sds* argv) {
     if (loadConfigFromArgv(echoServer->config, argv + attribute_index, argc - attribute_index) == 0) {
         goto fail;
     }
+
+    sds file = configGetSds(echoServer->config, "logfile");
+    if (file == NULL) {
+        log_add_stdout("latte_c", LOG_DEBUG);
+        log_add_stdout(LATTE_ECHO_SERVER_LOG_TAG, LOG_DEBUG);
+    } else {
+        log_add_file("latte_c", file, LOG_INFO);
+        log_add_file(LATTE_ECHO_SERVER_LOG_TAG, file, LOG_INFO);
+    }
     echoServer->server.port = configGetLongLong(echoServer->config, "port");
     echoServer->server.bind = configGetArray(echoServer->config, "bind");
     echoServer->server.tcp_backlog = configGetLongLong(echoServer->config, "tcp-backlog");
     echoServer->server.el = aeCreateEventLoop(1024);
-    // echoServer->server.logFile = configGetSds(echoServer->config, "logFile");
-    initLogger();
-    log_add_stdout(LATTE_ECHO_SERVER_LOG_TAG, LOG_DEBUG);
-    // if (sdslen(echoServer->server.logFile) == 0) {
-
-    // }
+    
     initInnerLatteServer(&echoServer->server);
     echoServer->server.maxclients = 100;
     if (echoServer->server.el == NULL) {

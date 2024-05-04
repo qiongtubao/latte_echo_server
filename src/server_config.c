@@ -26,6 +26,14 @@ configRule tcp_backlog_rule = {
     .value = (void*)DEFAULT_TCP_BACKLOG
 };
 
+configRule logfile_rule = {
+    .update = sdsUpdate,
+    .writeConfigSds = sdsWriteConfigSds,
+    .releaseValue = sdsReleaseValue,
+    .load = sdsLoadConfig,
+    .value = NULL
+};
+
 /** latte config module **/
 config* createServerConfig() {
     config* c = createConfig();
@@ -36,5 +44,7 @@ config* createServerConfig() {
     registerConfig(c, bind, &bind_rule);
     sds tcp_backlog = sdsnewlen("tcp-backlog", 11);
     registerConfig(c, tcp_backlog, &tcp_backlog_rule);
+    sds logfile = sdsnewlen("logfile", 7);
+    registerConfig(c, logfile, &logfile_rule);
     return c;
 }
