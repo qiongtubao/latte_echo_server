@@ -15,6 +15,7 @@ ifeq ($(uname_S),Linux)
 	FINAL_SHARD_LIB=-lrt 
 endif
 
+LATTE_LIBS:= ../deps/latte_c/out/lib/liblatte.a 
 latte_lib:
 	cd ../deps/latte_c && make build MODULES=$(LIB_MODUELS) 
 
@@ -25,7 +26,7 @@ MAC_M1_CFLAGS=-fprofile-arcs -ftest-coverage
 OBJS= main.o server.o  server_config.o client.o
 # -lstdc++
 all: latte_lib $(OBJS) 
-	$(LATTE_REDIS_CC) -o main $(OBJS) -I../deps/latte_c/out/include ../deps/latte_c/out/lib/liblatte.a  ../deps/latte_c/deps/jemalloc/lib/libjemalloc.a $(FINAL_SHARD_LIB) -lm  -ldl -lz -lstdc++ -lpthread $(MAC_M1_CFLAGS)
+	$(LATTE_REDIS_CC) -o main $(OBJS) -I../deps/latte_c/out/include $(LATTE_LIBS)  $(FINAL_SHARD_LIB) -lm  -ldl -lz -lstdc++ -lpthread $(MAC_M1_CFLAGS)
 	
 
 clean:

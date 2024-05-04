@@ -10,6 +10,6 @@ typedef struct client {
     struct latteClient client;
 } client;
 
-client *createEchoClient();
-void freeEchoClient(client *c);
+latteClient *createEchoClient();
+void freeEchoClient(latteClient *c);
 #endif

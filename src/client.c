@@ -14,12 +14,12 @@ int echoHandler(struct latteClient* lc) {
     }
     return 1;
 }
-client *createEchoClient() {
+latteClient *createEchoClient() {
     client* c = zmalloc(sizeof(client));
     c->client.exec = echoHandler;
     return c;
 }
 
-void freeEchoClient(client* c) {
+void freeEchoClient(latteClient* c) {
     zfree(c);
 }

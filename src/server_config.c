@@ -7,7 +7,7 @@ configRule port_rule = {
     .writeConfigSds = longLongWriteConfigSds,
     .releaseValue = longLongReleaseValue,
     .load = longLongLoadConfig,
-    .value = DEFAULT_PORT
+    .value = (void*)DEFAULT_PORT
 };
 
 
@@ -23,7 +23,7 @@ configRule tcp_backlog_rule = {
     .writeConfigSds = longLongWriteConfigSds,
     .releaseValue = longLongReleaseValue,
     .load = longLongLoadConfig,
-    .value = DEFAULT_TCP_BACKLOG
+    .value = (void*)DEFAULT_TCP_BACKLOG
 };
 
 /** latte config module **/

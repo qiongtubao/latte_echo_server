@@ -19,6 +19,7 @@ sds* parseArgv(int argc, char** argv, int* len) {
 
 int main(int argc, char **argv) {
     int exec_argc;
+    initLogger();
     sds* exec_argv = parseArgv(argc, argv, &exec_argc);
     startEchoServer(&echoServer, exec_argc, exec_argv);
 
