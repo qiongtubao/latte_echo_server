@@ -8,7 +8,7 @@
 
 int echoHandler(struct latteClient* lc) {
     struct client* c = (struct client*)lc; 
-    lc->qb_pos = sdslen(lc->querybuf);
+    lc->qb_pos = sds_len(lc->querybuf);
     if (connWrite(lc->conn, lc->querybuf, lc->qb_pos) == -1) {
         echoServerLog(LOG_DEBUG,"write fail");
     }

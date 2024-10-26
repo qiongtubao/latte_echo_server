@@ -29,7 +29,7 @@ typedef void (*tcpHandlerFunc)(aeEventLoop *el, int fd, void *privdata, int mask
 
 
 
-config* createServerConfig();
+config_manager_t* create_server_config();
 
 /** latte redis server **/
 typedef struct latteEchoServer {
@@ -38,7 +38,7 @@ typedef struct latteEchoServer {
     sds* exec_argv;
     sds executable; /** execut file path **/
     sds configfile;
-    struct config* config;
+    config_manager_t* config;
 } latteEchoServer;
 
 

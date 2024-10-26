@@ -218,19 +218,19 @@ void nolocks_localtime(struct tm *tmp, time_t t, time_t tz, int dst) {
 sds getAbsolutePath(char *filename) {
     char cwd[1024];
     sds abspath;
-    sds relpath = sdsnew(filename);
+    sds relpath = sds_new(filename);
 
-    relpath = sdstrim(relpath," \r\n\t");
+    relpath = sds_trim(relpath," \r\n\t");
     if (relpath[0] == '/') return relpath; /* Path is already absolute. */
 
     /* If path is relative, join cwd and relative path. */
     if (getcwd(cwd,sizeof(cwd)) == NULL) {
-        sdsfree(relpath);
+        sds_delete(relpath);
         return NULL;
     }
-    abspath = sdsnew(cwd);
-    if (sdslen(abspath) && abspath[sdslen(abspath)-1] != '/')
-        abspath = sdscat(abspath,"/");
+    abspath = sds_new(cwd);
+    if (sds_len(abspath) && abspath[sds_len(abspath)-1] != '/')
+        abspath = sds_cat(abspath,"/");
 
     /* At this point we have the current path always ending with "/", and
      * the trimmed relative path. Try to normalize the obvious case of
@@ -238,25 +238,25 @@ sds getAbsolutePath(char *filename) {
      *
      * For every "../" we find in the filename, we remove it and also remove
      * the last element of the cwd, unless the current cwd is "/". */
-    while (sdslen(relpath) >= 3 &&
+    while (sds_len(relpath) >= 3 &&
            relpath[0] == '.' && relpath[1] == '.' && relpath[2] == '/')
     {
-        sdsrange(relpath,3,-1);
-        if (sdslen(abspath) > 1) {
-            char *p = abspath + sdslen(abspath)-2;
+        sds_range(relpath,3,-1);
+        if (sds_len(abspath) > 1) {
+            char *p = abspath + sds_len(abspath)-2;
             int trimlen = 1;
 
             while(*p != '/') {
                 p--;
                 trimlen++;
             }
-            sdsrange(abspath,0,-(trimlen+1));
+            sds_range(abspath,0,-(trimlen+1));
         }
     }
 
     /* Finally glue the two parts together. */
-    abspath = sdscatsds(abspath,relpath);
-    sdsfree(relpath);
+    abspath = sds_cat_sds(abspath,relpath);
+    sds_delete(relpath);
     return abspath;
 }
 
@@ -266,24 +266,24 @@ int startEchoServer(struct latteEchoServer* echoServer, int argc, sds* argv) {
     echoServer->exec_argv = argv;
     //argv[0] is exec file
     echoServer->executable = getAbsolutePath(argv[0]);
-    echoServer->config = createServerConfig();
+    echoServer->config = create_server_config();
     //argv[1] maybe is config file
     int attribute_index = 1;
     if (argc > 1) {
         if(argv[1][0] != '-') {
             echoServer->configfile = getAbsolutePath(argv[1]);
-            if (loadConfigFromFile(echoServer->config, echoServer->configfile) == 0) {
+            if (load_config_from_file(echoServer->config, echoServer->configfile) == 0) {
                 goto fail;
             }
             attribute_index++;
         }
     }
     //add config attribute property
-    if (loadConfigFromArgv(echoServer->config, argv + attribute_index, argc - attribute_index) == 0) {
+    if (load_config_from_argv(echoServer->config, argv + attribute_index, argc - attribute_index) == 0) {
         goto fail;
     }
 
-    sds file = configGetSds(echoServer->config, "logfile");
+    sds file = config_get_sds(echoServer->config, "logfile");
     if (file == NULL) {
         log_add_stdout("latte_c", LOG_DEBUG);
         log_add_stdout(LATTE_ECHO_SERVER_LOG_TAG, LOG_DEBUG);
@@ -291,9 +291,9 @@ int startEchoServer(struct latteEchoServer* echoServer, int argc, sds* argv) {
         log_add_file("latte_c", file, LOG_INFO);
         log_add_file(LATTE_ECHO_SERVER_LOG_TAG, file, LOG_INFO);
     }
-    echoServer->server.port = configGetLongLong(echoServer->config, "port");
-    echoServer->server.bind = configGetArray(echoServer->config, "bind");
-    echoServer->server.tcp_backlog = configGetLongLong(echoServer->config, "tcp-backlog");
+    echoServer->server.port = config_get_int64(echoServer->config, "port");
+    echoServer->server.bind = config_get_array(echoServer->config, "bind");
+    echoServer->server.tcp_backlog = config_get_int64(echoServer->config, "tcp-backlog");
     echoServer->server.el = aeCreateEventLoop(1024);
     
     initInnerLatteServer(&echoServer->server);
